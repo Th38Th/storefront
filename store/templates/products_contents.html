@@ -1,0 +1,181 @@
+{% load custom_filters %}
+{% load static %}
+<script type="text/javascript">
+    function updateProductInCart(){
+        let productId = $(this).data('productid');
+            $.ajax({
+                url: `/store/get-cart-item`,
+                type: 'GET',
+                data: {"id" : productId},
+                success: function (response) {
+                    $(`span[data-property='incart'][data-productid='${productId}']`)
+                    .html(response.quantity>0? response.quantity+" in cart." : "&nbsp;");
+                },
+                error: function () {
+                    alert('Error getting item quantity.');
+                }
+            })
+    }
+    function slideInProduct(index,elem) {
+        let duration = index*500*3;
+        console.log(duration);
+        $(elem).delay(duration).toggleClass("shown");
+    }
+    $("document").ready(() => {
+        $(".product-image img").contextmenu((e) => { e.preventDefault() })
+            .on("dragstart", (e) => { e.preventDefault() });
+        $("button[data-action='minus']").click(function () {
+            let productId = $(this).data('productid');
+            $(`input[data-property="quantity"][data-productid="${productId}"]`)
+                .val((i, v) => Math.max(0, parseInt(v) - 1)).trigger('change')
+        })
+        $("button[data-action='plus']").click(function () {
+            let productId = $(this).data('productid');
+            $(`input[data-property="quantity"][data-productid="${productId}"]`)
+                .val((i, v) => parseInt(v) + 1).trigger('change');
+        })
+        $('input[data-property="quantity"]').change(function () {
+            let productId = $(this).data('productid');
+            $(this).val((i, v) => isNaN(parseInt(v)) ? 0 : v);
+            let value = $(this).val();
+            $(`button[data-action='minus'][data-productid="${productId}"]`)
+                .prop("disabled", value <= 0);
+            $(`button[data-action="add"][data-productid="${productId}"]`)
+                .prop("disabled", value <= 0)
+                .attr("title", value > 0? "Add To Cart" : "Select a quantity first!");
+        }).val(0).trigger('change');
+        $('button[data-action="add"]').click(function () {
+            let csrftoken = Cookies.get('csrftoken');
+            let productId = $(this).data('productid');
+            let quantity = $(`input[data-property="quantity"][data-productid="${productId}"]`).val()
+            $.ajax({
+                url: `/store/add-cart-item/`,
+                headers: { 'X-CSRFToken': csrftoken },
+                data: { qty: quantity, id: productId },
+                type: 'POST',
+                success: function (response) {
+                    if (!response.success) {
+                        alert('Failed to add product to cart.');
+                    }
+                },
+                error: function () {
+                    alert('Error adding product to cart.');
+                }
+            });
+            $(`input[data-property="quantity"][data-productid="${productId}"]`)
+                .val(0).trigger('change');
+        })
+        $(".product-card")
+        .hover(updateProductInCart)
+        .click(updateProductInCart)
+        .scroll(updateProductInCart)
+        .each(updateProductInCart)
+        .each(slideInProduct);
+    });
+</script>
+<style type="text/css">
+    .table-sef-mw {
+        display: grid;
+        grid-template-columns: max-content 1fr max-content;
+        /* Adjust the number of columns */
+    }
+
+    .row {
+        display: contents;
+        /* Make rows transparent in terms of layout */
+    }
+
+    .tbody {
+        display: contents;
+    }
+
+    .cell {
+        padding: 10px;
+        width: fit-content;
+        /*border: 1px solid #ccc; /* Optional: Add borders for cell separation */
+    }
+
+    .cell:last-child {
+        margin-left: auto;
+    }
+
+    .header .cell {
+        font-weight: bold;
+        background-color: #f2f2f2;
+        /* Optional: Add background color for header */
+    }
+
+    .base-flex-container {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    .product-card {
+        margin: 2em 2em;
+    }
+
+    .product-image {
+        border-radius: 1em;
+        padding: 1em;
+        border: .1em solid grey;
+        /*box-shadow: .05em .05em .05em .05em rgba(50, 50, 50, 0.5);*/
+    }
+
+    .product-card {
+        transform: scale(0, 0);
+        transform-origin: 50% 0%;
+        max-height: 0;
+    }
+
+    .product-card.shown {
+        transform: scale(1,1);
+        max-height: fit-content;
+        transition-duration: .5s;
+    }
+</style>
+{% for product in products %}
+<div class="mdc-card product-card" data-productid="{{ product.id }}">
+    <div class="table-sef-mw">
+        <div class="row">
+            <div class="cell" style="grid-column: 1; grid-row: span 3">
+                <div class="product-image" data-productid="{{product.id}}" style="width: fit-content;">
+                    <img src="{% get_media_prefix %}products/{{product.id}}.png" 
+                        width="128" height="128"
+                        id="{{product.id}}_prod_img" />
+                </div>
+            </div>
+            <div class="cell" style="grid-column: 2; grid-row: 1; font-style: oblique; font-size: 1.5em;">
+                {{product.title}}</div>
+            {% with product.price|split_price as price_parts %}
+            <div class="cell" style="grid-column: 3; grid-row: 1">
+                <span style="font-size: 2em; font-style: italic; font-weight: bold;">$</span>
+                <span style="font-size: 2em;">{{price_parts.integer}}</span>
+                <span style="vertical-align: top; line-height: 2.5em;">.{{price_parts.decimal}}</span>
+            </div>
+            {% endwith %}
+        </div>
+        <div class="row">
+            <div class="cell" style="grid-column: 2; grid-row: 2">{{product.description}}</div>
+            <div class="cell" style="grid-column: 3; grid-row: 2">
+                <span class="base-flex-container">
+                    <button data-productid="{{product.id}}" data-action="minus" style="display: inline;"
+                        class="mdc-button--outlined" id="{{product.id}}_minus_button">-</button>
+                    <input data-productid="{{product.id}}" data-property="quantity" type="text"
+                        style="display: inline; width: 3em; text-align: center;" class="mdc-text-field__input"
+                        id="{{product.id}}_qty_field">
+                    <button data-productid="{{product.id}}" data-action="plus" style="display: inline;"
+                        class="mdc-button--outlined" id="{{product.id}}_plus_button">+</button>
+                </span>
+            </div>
+        </div>
+        <div class="row">
+            <div class="cell" style="grid-column: 3">
+                <button data-productid="{{product.id}}" data-action="add" class="mdc-button--raised">Add to
+                    Cart</button>
+                <span style="display: block; font-size: 1em;" data-productid="{{product.id}}" data-property="incart">&nbsp;</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}

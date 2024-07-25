@@ -1,0 +1,172 @@
+{% load static %}
+<script type="text/javascript">
+  function showHideCart(){
+    // Toggle the "caret-down" class on the clicked element
+    $(this).parent(".cart-head").toggleClass('cart-head-down');
+    // Toggle the visibility of the nested list next to the clicked element
+    $(this).parent(".cart-head").siblings(".cart").toggleClass("expanded");
+    updateProductsInCart();
+  }
+  $('document').ready(()=>{
+    updateProductsInCart();
+    $('.cart-icon').click(showHideCart);
+    $('#cart-button-checkout').click(function(){
+      let csrftoken = Cookies.get('csrftoken');
+      $.ajax({
+        url: `/store/checkout/`,
+        type: 'POST',
+        headers: {'X-CSRFToken': csrftoken},
+        mode: "same-origin",
+        success: function(response) {
+          showHideCart();
+        },
+        error: function() {
+            alert('Error checking out cart.');
+        }
+      })
+    })
+  });
+  function updateProductsInCart(){
+    $.ajax({
+        url: `/store/cart/`,
+        type: 'GET',
+        success: function(response) {
+          $(".cart-item-list").html(response.html);
+          let items = JSON.parse(response.json);
+          if (items.length == 0){
+            $(".cart-subtotal,.checkout-area").hide();
+          } else {
+            $(".cart-subtotal,.checkout-area").show();
+          }
+          console.log(items);
+          $("#cart-button-checkout").prop("disabled", items.length == 0);
+          $("#total").html(response.sum);
+        },
+        error: function() {
+            alert('Error getting cart.');
+        }
+    })
+  }
+</script>
+<style type="text/css">
+  .cart-head .cart-title {
+    border-width: .1em;
+    border-color: var(--mdc-theme-primary);
+    border-radius: 8em 0 8em 0;
+    padding: .25em;
+    font-size: 2em;
+    height: 100%;
+    display: inline-block;
+    height: 100%;
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    transform: scale(0,1);
+    transform-origin: 100% 50%;
+    background-color: var(--mdc-theme-primary);
+  }
+
+  .cart-head {
+      width: 100%;
+      text-align: right;
+      margin-bottom: 1em;
+  }
+
+  .cart-icon {
+      pointer-events: all;
+      border-radius: 0 8em 0 8em;
+      border: .05em black solid;
+      padding: .5em;
+      display: inline;
+      font-family: 'Material Icons';
+      padding: .25em;
+      font-size: 2em;
+      border-radius: 8em;
+      vertical-align: middle;
+      width: 100%;
+      cursor: pointer;
+      user-select: none; /* Prevent text selection */
+      color: black;
+      background-color: white;
+  }
+
+  .cart-head-down .cart-icon {
+    border: .05em transparent solid;
+    color: white;
+    background-color: var(--mdc-theme-primary);
+    transition-duration: .5s;
+  }
+  
+  .cart-head-down {
+    color: white;
+    width: 100%;
+    transition: background-color .25s;
+    transition-duration: .5s;
+  }
+
+  .cart-head-down .cart-title {
+    transform: scale(1,1);
+    transition-duration: .5s;
+  }
+
+  .cart-item-list {
+    width: fit-content;
+    max-height: 25vh;
+    overflow-y: auto;
+  }
+
+  .cart-container {
+    pointer-events: none;
+    background-color: transparent;
+    width: fit-content;
+    position: fixed; 
+    z-index: 9999;
+    right: .5em; 
+    top: .5em;
+  }
+
+  /* Hide the nested list */
+  .cart {
+    pointer-events: all;
+    max-height: 0;
+    padding: .5em;
+    background: white;
+    transform: scale(0, 0);
+    transform-origin: 100% 0%;
+    transition-duration: .5s;
+  }
+
+  .cart.expanded {
+    max-height: 100%;
+    transition: transform .5s;
+    transform: scale(1, 1);
+  }
+</style>
+<style>
+    .table-4c {
+        display: grid;
+        grid-template-columns: max-content max-content 1fr max-content;
+    }
+    .cart-item-property {
+        display: inline-block;
+    }
+</style>
+<div class="cart-container">
+    <div class="cart-head"><div class="cart-title">YOUR CART</div><div class="cart-icon">shopping_cart</div></div>
+    <div class="cart mdc-card">
+        <div class="cart-item-list">
+        </div>
+        <div class="table-4c checkout-area">
+          <div class="row">
+            <div class="cell" style="grid-column: span 2;"></div>
+            <div class="cell" style="grid-column: 3; text-align: right; width: 100%;">
+              <span class="cart-subtotal" style="font-weight: bold;">
+                SUBTOTAL $<span id="total"></span>
+              </span>
+            </div>
+            <div class="cell" style="text-align: center; max-width: 10em;">
+              <button id="cart-button-checkout" style="display: block;"
+               class="mdc-button--raised">Check Out</button></div>
+          </div>
+        </div>
+    </div>
+</div>

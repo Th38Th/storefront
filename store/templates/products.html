@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %} Our products {% endblock %}
+{% block content %}
+<script type="text/javascript">
+$('document').ready(()=>{
+    getProducts(function(response){
+        products = JSON.parse(response.json);
+        let prices = products.map(x=>parseFloat(x.fields.price));
+        $("#price-min").val(Math.min(...prices));
+        $("#price-max").val(Math.max(...prices));
+    });
+    updateProductsList();
+    $("#products-list").scroll(updateProductsList);
+    $(".filters").children().change(updateProductsList)
+});
+function getProducts(andThen){
+    let price_min = $("#price-min").val();
+    let price_max = $("#price-max").val();
+    if (price_max == 0) price_max = Infinity;
+    let sort_on = $("#sort-field").val();
+    let text_has = $("#search-box").val();
+    let sort_order = $(".filters input[type='radio'][name='sort-order']:checked").val();
+    $.ajax({
+        url: `/store/get-products-filtered`,
+        type: 'GET',
+        data: {
+            price_min: price_min,
+            price_max: price_max,
+            sort_on: sort_on,
+            sort_order: sort_order,
+            text_has: text_has
+        },
+        success: andThen,
+        error: function() {
+            alert('Error getting products.');
+        }
+    })
+}
+function updateProductsList(){
+    $("#products-list").html("");
+    $("#products-loading-panel").show();
+    $("#products-missing").hide();
+    getProducts(function(response) {
+        $("#products-list").html(response.html);
+        $("#products-loading-panel").hide();
+        products = JSON.parse(response.json);
+        if (products.length == 0)
+            $("#products-missing").show();
+        else $("#products-missing").hide();
+    });
+}
+</script>
+<style type="text/css">
+    .filter-card {
+        background-color: lightgray;
+        border: 2px solid darkgray;
+        padding: .25em;
+    }
+</style>
+<h1>Check out our products!</h1>
+<div class="filters">
+    <div class="mdc-card filter-card" style="display: inline-block;">
+        <label for="search-box" class="label-basic">
+            Search our catalog:
+            <input type="search" id="search-box" placeholder="Type here..."></text>
+        </label>
+    </div>
+    <div class="mdc-card filter-card" style="display: inline-block;">
+        Price:
+        <input type="number" style="width: 5em;" id="price-min" value="0" min="0"/> - 
+        <input type="number" style="width: 5em;" id="price-max" value="0" min="0"/>
+    </div>
+    <div class="mdc-card filter-card" style="display: inline-block;">
+        Sort by:
+        <select id="sort-field">
+            <option value="title">Name</option>
+            <option value="price">Price</option>
+        </select>
+        <label for="sort-order-asc" class="label-basic">
+            Ascending
+            <input type="radio" name="sort-order" id="sort-order-asc" value="ASC" checked></input>
+        </label>
+        <label for="sort-order-desc" class="label-basic">
+            Descending
+            <input type="radio" name="sort-order" id="sort-order-desc" value="DESC"></input>
+        </label>
+    </div>
+</div>
+<div>
+    <div id="products-list">
+    </div>
+    <div id="products-loading-panel" class="centered-panel"> 
+        <div>Loading...</div>
+        <div class='loading'></div>
+    </div>
+    <div id="products-missing" class="centered-panel">
+        No products found...
+    </div>
+</div>
+{% endblock %}
