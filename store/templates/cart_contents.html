@@ -1,38 +1,9 @@
 {% load static %}
-<script type="text/javascript">
-    $("document").ready(() => {
-        $("input[type='number'][data-productid]").change(function () {
-            let productid = $(this).data("productid");
-            let value = $(this).val();
-            if (value <= 0 && !confirm("Are you sure you want to remove the product?")) return;
-            let csrftoken = Cookies.get('csrftoken');
-            $.ajax({
-                url: `/store/update-cart-item/`,
-                type: 'POST',
-                data: {
-                    id: productid,
-                    qty: value
-                },
-                headers: { 'X-CSRFToken': csrftoken },
-                mode: "same-origin",
-                success: function (response) {
-                    if (response.success && response.quantity == 0)
-                        $(`.cart-item[data-productid='${productid}']`).remove();
-                },
-                error: function () {
-                    alert('Error updating product.');
-                }
-            })
-        })
-    })
-</script>
 <div class="table-4c">  
 {% for item in cart_items %}
 <div class="row cart-item" data-productid="{{item.product.pk}}">
     <div class="cell">
-        <input type="number" data-productid="{{item.product.pk}}" 
-        min="0" max="{{ item.product.stock }}" class="cart-item-property"
-        value="{{ item.quantity }}" style="outline: none; border: none; width: 3em; text-align: right;" />x
+        <span>{{ item.quantity }}</span> x
     </div>
     <div class="cell">
         <img class="cart-item-property" src="{% get_media_prefix %}products/{{item.product.pk}}.png" width="64" height="64" />

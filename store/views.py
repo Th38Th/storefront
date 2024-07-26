@@ -59,7 +59,7 @@ def get_products_filtered(request : HttpRequest):
         products = products.filter(Q(title__icontains=text_has) | Q(description__icontains=text_has)) 
     except:
         pass
-    time.sleep(2)
+    time.sleep(.25)
     products_json = serializers.serialize('json',products)
     return JsonResponse({"json": products_json, "html": render_to_string("products_contents.html", {'products': products})})
 
@@ -78,7 +78,7 @@ def add_cart_item(request : HttpRequest):
     productId = request.POST["id"]
     prod = Product.objects.get(pk=productId)
     item, _ = CartItem.objects.get_or_create(cart=cart, product=prod)
-    item.quantity += qty
+    item.quantity = qty
     item.save()
     return JsonResponse({'success': True, 'message': 'Product added to cart', 'quantity': item.quantity})
 
@@ -93,13 +93,13 @@ def get_cart_item(request : HttpRequest):
         qty = 0
     return JsonResponse({'quantity': qty})
 
-def update_cart_item(request: HttpRequest):
+def merge_cart_item(request: HttpRequest):
     cart = ensure_cart(request)
     qty = int(request.POST["qty"])
     productId = request.POST["id"]
     prod = Product.objects.get(pk=productId)
     try:
-        item = CartItem.objects.get(cart=cart, product=prod)
+        item, _ = CartItem.objects.get_or_create(cart=cart, product=prod)
         item.quantity = min(qty, prod.stock)
         if item.quantity <= 0:
             message = 'Product removed from cart'

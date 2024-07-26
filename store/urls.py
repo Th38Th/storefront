@@ -11,7 +11,5 @@ urlpatterns = [
     path('get-products-filtered', views.get_products_filtered),
     path('cart/', views.get_cart_contents),
     path('checkout/', views.checkout),
-    path('add-cart-item/', views.add_cart_item),
-    path('update-cart-item/', views.update_cart_item),
-    path('get-cart-item', views.get_cart_item)
+    path('merge-cart-item/', views.merge_cart_item)
 ]

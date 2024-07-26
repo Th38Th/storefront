@@ -1,21 +1,6 @@
 {% load custom_filters %}
 {% load static %}
 <script type="text/javascript">
-    function updateProductInCart(){
-        let productId = $(this).data('productid');
-            $.ajax({
-                url: `/store/get-cart-item`,
-                type: 'GET',
-                data: {"id" : productId},
-                success: function (response) {
-                    $(`span[data-property='incart'][data-productid='${productId}']`)
-                    .html(response.quantity>0? response.quantity+" in cart." : "&nbsp;");
-                },
-                error: function () {
-                    alert('Error getting item quantity.');
-                }
-            })
-    }
     function slideInProduct(index,elem) {
         let duration = index*500*3;
         console.log(duration);
@@ -40,37 +25,78 @@
             let value = $(this).val();
             $(`button[data-action='minus'][data-productid="${productId}"]`)
                 .prop("disabled", value <= 0);
-            $(`button[data-action="add"][data-productid="${productId}"]`)
-                .prop("disabled", value <= 0)
-                .attr("title", value > 0? "Add To Cart" : "Select a quantity first!");
-        }).val(0).trigger('change');
-        $('button[data-action="add"]').click(function () {
-            let csrftoken = Cookies.get('csrftoken');
-            let productId = $(this).data('productid');
-            let quantity = $(`input[data-property="quantity"][data-productid="${productId}"]`).val()
+            if (value >= 0 && (value > 0 || confirm("Remove product from cart?")))
+                updateProductInCartWithIdAndQty(productId, value);
+            else updateButtons(productId, value);
+        }).val(-1).trigger('change');
+        function addProductToCartById(productId){
+            updateProductInCartWithIdAndQty(productId, 1);
+        }
+        function getProductsInCart(){
             $.ajax({
-                url: `/store/add-cart-item/`,
+                url: `/store/cart/`,
+                type: 'GET',
+                success: function(response) {
+                    let items = JSON.parse(response.json);
+                    items.forEach(x => 
+                        updateButtons(x.fields.product,x.fields.quantity)
+                    );
+                },
+                error: function() {
+                    alert('Error getting cart.');
+                }
+            })
+        }
+        function removeProductFromCart(){
+            let productId = $(this).data('productid');
+            updateProductInCartWithIdAndQty(productId, 0);
+        }
+        function addProductToCart(){
+            let productId = $(this).data('productid');
+            addProductToCartById(productId);
+        }
+        function updateButtons(productId, value){
+            let btnAdd = $(`button[data-action="add"][data-productid="${productId}"]`);
+            let btnRemove = $(`button[data-action="remove"][data-productid="${productId}"]`);
+            let qtcQuantity = $(`.quantity-control[data-productid="${productId}"]`);
+            let inpQuantity = $(`input[data-property='quantity'][data-productid="${productId}"]`);
+            if (value > 0) {
+                qtcQuantity.show();
+                btnAdd.hide();
+                btnRemove.show();
+            }
+            else {
+                qtcQuantity.hide();
+                btnRemove.hide();
+                btnAdd.show();
+            }
+            inpQuantity.val(value);
+        }
+        function updateProductInCartWithIdAndQty(productId, quantity) {
+            let csrftoken = Cookies.get('csrftoken');
+            let btnAdd = $(`button[data-action="add"][data-productid="${productId}"]`);
+            let btnRemove = $(`button[data-action="remove"][data-productid="${productId}"]`);
+            let qtcQuantity = $(`.quantity-control[data-productid="${productId}"]`);
+            $.ajax({
+                url: `/store/merge-cart-item/`,
                 headers: { 'X-CSRFToken': csrftoken },
                 data: { qty: quantity, id: productId },
                 type: 'POST',
                 success: function (response) {
-                    if (!response.success) {
-                        alert('Failed to add product to cart.');
-                    }
+                    if (!response.success) alert
+                        ('Failed to update product in cart.');
+                    let value = response.quantity;
+                    updateButtons(productId, value);
                 },
                 error: function () {
-                    alert('Error adding product to cart.');
+                    alert('Error updating product to cart.');
                 }
             });
-            $(`input[data-property="quantity"][data-productid="${productId}"]`)
-                .val(0).trigger('change');
-        })
-        $(".product-card")
-        .hover(updateProductInCart)
-        .click(updateProductInCart)
-        .scroll(updateProductInCart)
-        .each(updateProductInCart)
-        .each(slideInProduct);
+        }
+        getProductsInCart();
+        $('button[data-action="add"]').click(addProductToCart);
+        $('button[data-action="remove"]').click(removeProductFromCart);
+        $(".product-card").each(slideInProduct);
     });
 </script>
 <style type="text/css">
@@ -105,10 +131,10 @@
         /* Optional: Add background color for header */
     }
 
-    .base-flex-container {
+    .quantity-control {
         display: flex;
         align-items: center;
-        justify-content: flex-end;
+        justify-content: space-around;
     }
 
     .product-card {
@@ -126,6 +152,7 @@
         transform: scale(0, 0);
         transform-origin: 50% 0%;
         max-height: 0;
+        padding: .5em;
     }
 
     .product-card.shown {
@@ -133,32 +160,60 @@
         max-height: fit-content;
         transition-duration: .5s;
     }
+
+    .flexxer-row {
+        display: flex;
+        justify-content: space-between;
+        justify-items:safe;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .flexxer-column {
+        display: flex;
+        gap: 1em;
+        justify-content: space-between;
+        flex-direction: column;
+        flex-wrap: wrap;
+    }
 </style>
 {% for product in products %}
 <div class="mdc-card product-card" data-productid="{{ product.id }}">
-    <div class="table-sef-mw">
-        <div class="row">
-            <div class="cell" style="grid-column: 1; grid-row: span 3">
-                <div class="product-image" data-productid="{{product.id}}" style="width: fit-content;">
-                    <img src="{% get_media_prefix %}products/{{product.id}}.png" 
-                        width="128" height="128"
-                        id="{{product.id}}_prod_img" />
+    <div class="flexxer-row">
+        <div class="flexxer-row" style="justify-items: safe; gap: .5em">
+            <div class="product-image" data-productid="{{product.id}}" style="width: fit-content;">
+                <img src="{% get_media_prefix %}products/{{product.id}}.png" 
+                    width="128" height="128"
+                    id="{{product.id}}_prod_img" />
+            </div>
+            <div class="flexxer-column" 
+            style="justify-content: start; gap: 1em; font-style: oblique; font-size: 1.5em;">
+                {{product.title}}
+                <div style="font-style: normal; font-size: .75em; max-width: 30em;">{{product.description}}</div>
+                {% with product.price|split_price as price_parts %}
+                <div>
+                    <span style="font-size: 2em; font-style: italic; font-weight: bold;">$</span>
+                    <span style="font-size: 2em;">{{price_parts.integer}}</span>
+                    <span style="vertical-align: top; line-height: 2.5em;">.{{price_parts.decimal}}</span>
                 </div>
+                {% endwith %}
             </div>
-            <div class="cell" style="grid-column: 2; grid-row: 1; font-style: oblique; font-size: 1.5em;">
-                {{product.title}}</div>
-            {% with product.price|split_price as price_parts %}
-            <div class="cell" style="grid-column: 3; grid-row: 1">
-                <span style="font-size: 2em; font-style: italic; font-weight: bold;">$</span>
-                <span style="font-size: 2em;">{{price_parts.integer}}</span>
-                <span style="vertical-align: top; line-height: 2.5em;">.{{price_parts.decimal}}</span>
-            </div>
-            {% endwith %}
         </div>
-        <div class="row">
-            <div class="cell" style="grid-column: 2; grid-row: 2">{{product.description}}</div>
-            <div class="cell" style="grid-column: 3; grid-row: 2">
-                <span class="base-flex-container">
+        <!--<div class="flexxer-row">-->
+        <!--</div>-->
+        <div class="flexxer-column" style="margin-left: auto; justify-content: space-around; justify-items: center;">
+            <div class="flexxer-column" style="align-self: flex-end;">
+                <button data-productid="{{product.id}}" 
+                    class="mdc-button--raised"
+                    data-action="add">
+                        Add to Cart
+                </button>
+                <button data-productid="{{product.id}}" 
+                    class="mdc-button--raised"
+                    data-action="remove">
+                        Remove
+                </button>
+                <div class="quantity-control" data-productid="{{product.id}}">
                     <button data-productid="{{product.id}}" data-action="minus" style="display: inline;"
                         class="mdc-button--outlined" id="{{product.id}}_minus_button">-</button>
                     <input data-productid="{{product.id}}" data-property="quantity" type="text"
@@ -166,14 +221,7 @@
                         id="{{product.id}}_qty_field">
                     <button data-productid="{{product.id}}" data-action="plus" style="display: inline;"
                         class="mdc-button--outlined" id="{{product.id}}_plus_button">+</button>
-                </span>
-            </div>
-        </div>
-        <div class="row">
-            <div class="cell" style="grid-column: 3">
-                <button data-productid="{{product.id}}" data-action="add" class="mdc-button--raised">Add to
-                    Cart</button>
-                <span style="display: block; font-size: 1em;" data-productid="{{product.id}}" data-property="incart">&nbsp;</span>
+                </div>
             </div>
         </div>
     </div>
